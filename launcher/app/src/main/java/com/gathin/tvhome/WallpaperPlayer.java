@@ -35,7 +35,10 @@ final class WallpaperPlayer {
     private final ImageView image;
     private final int backgroundColor;
     private final List<File> files;
-    private final long interval;
+    private long interval;
+    /** Choices from the Home wallpaper button, kept across restarts: stay on this picture, and minutes between changes. */
+    private static final String STATIC_KEY = "static", MINUTES_KEY = "minutes";
+    private boolean staticPicture;
     private final String order;
     private final SharedPreferences preferences;
     private final ExecutorService decoder = Executors.newSingleThreadExecutor();
@@ -55,6 +58,9 @@ final class WallpaperPlayer {
     /** wallpaper_captions: the shown picture's name from wallpapers/captions.txt; null when off or there are none. */
     private final TextView caption;
     private final Map<String, String> names;
+    /** The accent of each picture from wallpapers/accents.txt, and who wants to hear when it changes. */
+    private final Map<String, Integer> accents;
+    private java.util.function.IntConsumer accentListener;
     /** wallpaper_moods: the collection's groups by time of day; empty rotates through all of it. */
     private final Map<String, Set<String>> moods;
     /** config.xml latitude and longitude for the sun's times, and today's {sunrise, sunset} once worked out. */
@@ -72,6 +78,9 @@ final class WallpaperPlayer {
         dimColor = config.wallpaperDim > 0 ? (config.wallpaperDim * 255 / 100) << 24 : 0;
         order = config.wallpaperOrder;
         preferences = context.getSharedPreferences("wallpaper_rotation", Context.MODE_PRIVATE);
+        staticPicture = preferences.getBoolean(STATIC_KEY, false);
+        int minutes = preferences.getInt(MINUTES_KEY, 0);
+        if (minutes > 0) interval = minutes * 60_000L;
         moods = config.wallpaperMoods;
         latitude = moods.isEmpty() ? "" : context.getString(R.string.latitude);
         longitude = moods.isEmpty() ? "" : context.getString(R.string.longitude);
@@ -91,6 +100,8 @@ final class WallpaperPlayer {
         names = config.wallpaperCaptions && config.wallpaperEnabled && !files.isEmpty()
                 ? WallpaperCaptions.read(files.get(0).getParentFile()) : Collections.emptyMap();
         caption = names.isEmpty() ? null : makeCaption(context, root);
+        accents = config.wallpaperEnabled && !files.isEmpty()
+                ? WallpaperAccents.read(files.get(0).getParentFile()) : Collections.emptyMap();
         if (config.wallpaperEnabled && !files.isEmpty()) {
             root.addView(image, 0, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -126,6 +137,18 @@ final class WallpaperPlayer {
             playable = playable();
             first = WallpaperRotation.pick(playable, previous, order, random);
         }
+    }
+
+    /** Hears the shown picture's accent, 0 when it has none: now for the first picture, then at every change. */
+    void setAccentListener(java.util.function.IntConsumer listener) {
+        accentListener = listener;
+        notifyAccent();
+    }
+
+    private void notifyAccent() {
+        if (accentListener == null || accents.isEmpty()) return;
+        Integer accent = accents.get(displayed);
+        accentListener.accept(accent == null ? 0 : accent);
     }
 
     void start() {
@@ -172,11 +195,44 @@ final class WallpaperPlayer {
         List<File> playable = playable();
         File selected = WallpaperRotation.find(playable, previous);
         long changed = preferences.getLong("changed", 0);
-        if (selected == null || WallpaperRotation.due(changed, System.currentTimeMillis(), interval)) {
+        if (selected == null || !staticPicture && WallpaperRotation.due(changed, System.currentTimeMillis(), interval)) {
             selected = WallpaperRotation.pick(playable, previous, order, random);
         }
         if (selected == null || selected.getName().equals(displayed)) return;
-        File next = selected;
+        load(selected, previous, changed);
+    }
+
+    /** The wallpaper button: the next picture now, static or not. */
+    void next() {
+        if (!active || closed || loading || files.size() < 2) return;
+        String previous = preferences.getString("image", "");
+        File selected = WallpaperRotation.pick(playable(), previous, order, random);
+        if (selected != null && !selected.getName().equals(displayed)) load(selected, previous, 0);
+    }
+
+    int count() {
+        return files.size();
+    }
+
+    boolean isStatic() {
+        return staticPicture;
+    }
+
+    void setStatic(boolean on) {
+        staticPicture = on;
+        preferences.edit().putBoolean(STATIC_KEY, on).apply();
+    }
+
+    int minutes() {
+        return (int) (interval / 60_000L);
+    }
+
+    void setMinutes(int minutes) {
+        interval = minutes * 60_000L;
+        preferences.edit().putInt(MINUTES_KEY, minutes).apply();
+    }
+
+    private void load(File next, String previous, long changed) {
         loading = true;
         decoder.execute(() -> {
             Bitmap bitmap = decode(next);
@@ -195,6 +251,7 @@ final class WallpaperPlayer {
                 show(bitmap);
                 displayed = next.getName();
                 showCaption(true);
+                notifyAccent();
                 if (!displayed.equals(previous) || changed == 0) {
                     preferences.edit().putString("image", displayed)
                             .putLong("changed", System.currentTimeMillis()).apply();

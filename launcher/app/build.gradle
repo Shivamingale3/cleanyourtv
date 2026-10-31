@@ -13,6 +13,8 @@ android {
         targetSdk 34
         versionCode 11
         versionName '3.2'
+        // This TV runs in English only: the other languages are not packed.
+        resourceConfigurations += ['en']
     }
 
     buildTypes {

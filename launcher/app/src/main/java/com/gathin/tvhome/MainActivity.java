@@ -259,6 +259,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private BellDrawable bell;
     private MarigoldDrawable marigold;
     private int greetingColor;
+    /** Theme focus_color, or 0. */
+    private int focusColor;
+    /** The colours focus_color and the theme gave the header, for a wallpaper with no accent of its own. */
+    private int themeFocusColor, themeGreetingColor;
+    private View clockDivider;
+    private int themeDividerColor;
+    private ValueAnimator accentAnimator;
+    private boolean accentShown;
     /** The day the petal shower last played, so it greets the first Home of each day only. */
     private static LocalDate lastPetalShower;
     /** boot_to_live_tv: open the Live TV app on the first Home of each boot. */
@@ -486,7 +494,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         sky.setIntensity(cfg.skyIntensity);
         glass = findViewById(R.id.glass);
         glass.setStyle(cfg.glassStyle);
+        focusColor = themeFocusColor = cfg.focusColor;
         if (festive) glass.setAccent(festival.accentColor());
+        else if (focusColor != 0) glass.setAccent(focusColor);
         ambient = findViewById(R.id.ambient);
         // The glow is one bitmap, so its alpha can be applied while drawing it. Otherwise every frame of
         // a fade renders it into a full-screen offscreen buffer first.
@@ -514,12 +524,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         greeting = findViewById(R.id.greeting);
         clockBlock = findViewById(R.id.leftBlock);
         greetingColor = greeting.getCurrentTextColor();
+        if (focusColor != 0) greetingColor = liftTowardsWhite(focusColor, 0.25f);
         if (!cfg.showGreeting) greeting.setVisibility(View.GONE);
         if (cfg.headerWhite) {
             // The clock's own white for the date and the line before it, instead of their dimmed whites.
             ((TextView) findViewById(R.id.date)).setTextColor(Color.WHITE);
             findViewById(R.id.clockDivider).setBackgroundColor(Color.WHITE);
         }
+        clockDivider = findViewById(R.id.clockDivider);
+        themeGreetingColor = greetingColor;
+        themeDividerColor = cfg.headerWhite ? Color.WHITE : 0;
+        if (!festive) wallpaperPlayer.setAccentListener(this::applyWallpaperAccent);
         if (getResources().getBoolean(R.bool.rtl_menu_bar)) {
             // Center Hebrew greetings over the numeric time, independent of a visible AM/PM label. The clock's row
             // is watched too: date_below_clock can move the whole row right under a wider date.
@@ -558,6 +573,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (lunar) lunarDate.setVisibility(View.VISIBLE);
         greetingName = cfg.greetingName;
         if (cfg.dateBelowClock) moveDateBelowClock();
+        else if (cfg.clockGlass) applyClockGlass();
         if (shamsi) {
             shamsiDate.setVisibility(View.VISIBLE);
             TextView date = findViewById(R.id.date);
@@ -781,6 +797,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnInputs.setOnClickListener(v -> showInputs());
         btnWifi.setOnClickListener(v -> openNetworkPill());
         btnVpn.setOnClickListener(v -> openVpnPill());
+        View btnWallpaper = findViewById(R.id.btnWallpaper);
+        btnWallpaper.setOnClickListener(v -> showWallpaperMenu(v));
+        btnWallpaper.setVisibility(cfg.wallpaperButton && wallpaperPlayer.count() > 1 ? View.VISIBLE : View.GONE);
         btnWifi.setOnLongClickListener(v -> {
             open(systemIntent(Settings.ACTION_WIFI_SETTINGS));
             return true;
@@ -874,12 +893,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
         btnVpn.setOnKeyListener(pillKeys);
+        btnWallpaper.setOnKeyListener(pillKeys);
         btnSettings.setOnKeyListener(pillKeys);
         btnReorder.setOnKeyListener(pillKeys);
         btnLibraryTop.setOnKeyListener(pillKeys);
         for (View button : topAppButtons) button.setOnKeyListener(pillKeys);
         if (advancedEffects) {
-            List<View> pills = new ArrayList<>(Arrays.asList(btnInputs, btnWifi, btnVpn, btnReorder, btnLibraryTop, btnSettings));
+            List<View> pills = new ArrayList<>(Arrays.asList(btnInputs, btnWifi, btnVpn, btnWallpaper, btnReorder, btnLibraryTop, btnSettings));
             pills.addAll(topAppButtons);
             for (View button : pills) {
                 button.setOnFocusChangeListener((view, focused) -> view.animate()
@@ -1589,7 +1609,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         drop();
         reordering = false;
         adapter.setReordering(false);
-        glass.setAccent(festive ? festival.accentColor() : 0);
+        glass.setAccent(festive ? festival.accentColor() : focusColor);
         btnReorder.setActivated(false);
         List<String> keys = adapter.movableKeys();
         List<String> before = orderAtStart;
@@ -2399,6 +2419,73 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /**
+     * clock_glass: the clock, greeting and date in one capsule of the top bar pills' frosted glass, level with the top
+     * buttons. The accent shows only on the greeting and the line beside the clock.
+     */
+    private void applyClockGlass() {
+        LinearLayout block = (LinearLayout) clockBlock;
+        android.widget.TextClock date = findViewById(R.id.date);
+        TextView clock = findViewById(R.id.clock);
+        LinearLayout column = (LinearLayout) date.getParent();
+        LinearLayout clockRow = (LinearLayout) clock.getParent();
+        findViewById(R.id.ampm).setVisibility(View.GONE);
+        clock.setTextSize(44f);
+
+        block.removeView(greeting);
+        greeting.setTextSize(11f);
+        LinearLayout.LayoutParams greetingLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        greetingLp.bottomMargin = Math.round(3 * density);
+        column.addView(greeting, 0, greetingLp);
+
+        date.setFormat12Hour("EEEE, d MMMM");
+        date.setFormat24Hour("EEEE, d MMMM");
+        date.setAllCaps(false);
+        date.setTextSize(16f);
+        date.setLetterSpacing(0f);
+        date.setTextColor(Color.WHITE);
+        date.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout.LayoutParams dividerLp = (LinearLayout.LayoutParams) clockDivider.getLayoutParams();
+        dividerLp.height = Math.round(36 * density);
+        dividerLp.gravity = Gravity.CENTER_VERTICAL;
+        dividerLp.bottomMargin = 0;
+        clockDivider.setLayoutParams(dividerLp);
+
+        LinearLayout.LayoutParams columnLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        columnLp.gravity = Gravity.CENTER_VERTICAL;
+        column.setLayoutParams(columnLp);
+        clockRow.setBaselineAligned(false);
+        clockRow.setGravity(Gravity.CENTER_VERTICAL);
+        clockRow.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        // Without its rule against the top buttons the block is as wide as its texts, so the capsule hugs them.
+        android.widget.RelativeLayout.LayoutParams blockLp = (android.widget.RelativeLayout.LayoutParams) block.getLayoutParams();
+        blockLp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        blockLp.removeRule(android.widget.RelativeLayout.START_OF);
+        blockLp.removeRule(android.widget.RelativeLayout.LEFT_OF);
+        block.setLayoutParams(blockLp);
+
+        View buttons = findViewById(R.id.topButtons);
+        android.widget.RelativeLayout.LayoutParams buttonsLp = (android.widget.RelativeLayout.LayoutParams) buttons.getLayoutParams();
+        buttonsLp.removeRule(android.widget.RelativeLayout.ALIGN_BOTTOM);
+        buttonsLp.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        buttonsLp.bottomMargin = 0;
+        buttons.setLayoutParams(buttonsLp);
+
+        // pill_bg's resting glass. A radius past half the height draws a full capsule.
+        GradientDrawable capsule = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x2EFFFFFF, 0x14FFFFFF});
+        capsule.setCornerRadius(100 * density);
+        capsule.setStroke(Math.round(density), 0x38FFFFFF);
+        block.setBackground(capsule);
+        int h = Math.round(26 * density), v = Math.round(9 * density);
+        block.setPadding(h, v, h, v);
+    }
+
+    /**
      * date_below_clock: the date column moves to its own line under the clock, in the vertical LinearLayout that holds
      * the clock's row, and the line between them goes. In Hebrew (rtl_menu_bar) the date and the clock's row sit right.
      */
@@ -2995,6 +3082,33 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         shower.play(60, 2200, () -> root.removeView(shower));
     }
 
+    /** wallpapers/accents.txt: the header and focus highlight take the shown picture's colour, fading on a change. */
+    private void applyWallpaperAccent(int accent) {
+        int target = accent != 0 ? accent : themeFocusColor;
+        boolean first = !accentShown;
+        accentShown = true;
+        if (target == focusColor && !first) return;
+        int from = focusColor;
+        focusColor = target;
+        if (accentAnimator != null) accentAnimator.cancel();
+        if (first || from == 0 || target == 0 || !animations || reducedMotion) {
+            paintAccent(target);
+            return;
+        }
+        accentAnimator = ValueAnimator.ofObject(new ArgbEvaluator(), from, target);
+        accentAnimator.setDuration(300);
+        accentAnimator.addUpdateListener(a -> paintAccent((int) a.getAnimatedValue()));
+        accentAnimator.start();
+    }
+
+    private void paintAccent(int color) {
+        if (!reordering) glass.setAccent(color);
+        greetingColor = color != 0 ? liftTowardsWhite(color, 0.25f) : themeGreetingColor;
+        greeting.setTextColor(greetingColor);
+        if (color != 0) clockDivider.setBackgroundColor(color);
+        else if (themeDividerColor != 0) clockDivider.setBackgroundColor(themeDividerColor);
+    }
+
     private static int liftTowardsWhite(int argb, float amount) {
         int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
         r += (int) ((255 - r) * amount);
@@ -3462,6 +3576,59 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private static void fold(View view, List<View> folded) {
         view.setVisibility(View.GONE);
         folded.add(view);
+    }
+
+    private static final int[] WALLPAPER_MINUTES = {1, 5, 10, 15, 30, 60, 120, 240, 720, 1440};
+
+    /** Stays open while you press its rows, so Next can be pressed until the right picture is up. */
+    private void showWallpaperMenu(View anchor) {
+        View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
+        LinearLayout rows = panel.findViewById(R.id.rows);
+        PopupWindow popup = glassPopup(panel, (int) (290 * density));
+        View next = addWallpaperRow(rows, R.drawable.ic_picture);
+        ((TextView) next.findViewById(R.id.title)).setText(R.string.wallpaper_next);
+        next.setOnClickListener(v -> wallpaperPlayer.next());
+        View still = addWallpaperRow(rows, R.drawable.ic_lock);
+        View every = addWallpaperRow(rows, R.drawable.ic_settings);
+        Runnable labels = () -> {
+            ((TextView) still.findViewById(R.id.title)).setText(wallpaperPlayer.isStatic()
+                    ? R.string.wallpaper_static_on : R.string.wallpaper_static_off);
+            ((TextView) every.findViewById(R.id.title)).setText(getString(R.string.wallpaper_every,
+                    minutesLabel(wallpaperPlayer.minutes())));
+            every.setAlpha(wallpaperPlayer.isStatic() ? 0.45f : 1f);
+        };
+        labels.run();
+        still.setOnClickListener(v -> {
+            wallpaperPlayer.setStatic(!wallpaperPlayer.isStatic());
+            labels.run();
+        });
+        every.setOnClickListener(v -> {
+            int now = wallpaperPlayer.minutes();
+            int chosen = WALLPAPER_MINUTES[0];
+            for (int m : WALLPAPER_MINUTES) {
+                if (m > now) {
+                    chosen = m;
+                    break;
+                }
+            }
+            wallpaperPlayer.setMinutes(chosen);
+            labels.run();
+        });
+        dropIn(popup, panel, anchor, Gravity.END);
+        next.requestFocus();
+    }
+
+    private View addWallpaperRow(LinearLayout rows, int iconRes) {
+        View row = getLayoutInflater().inflate(R.layout.item_input, rows, false);
+        ((ImageView) row.findViewById(R.id.icon)).setImageResource(iconRes);
+        row.findViewById(R.id.status).setVisibility(View.GONE);
+        row.findViewById(R.id.dot).setVisibility(View.GONE);
+        rows.addView(row);
+        return row;
+    }
+
+    private static String minutesLabel(int minutes) {
+        return minutes >= 60 ? minutes / 60 + " h" : minutes + " min";
     }
 
     private PopupWindow glassPopup(View panel, int width) {

@@ -1,0 +1,5 @@
+01-amber-demon.jpg	#ff8a2e
+02-blue-fighter.jpg	#2eccff
+03-crimson-swordsman.jpg	#ff2e4f
+04-teal-ninja.jpg	#2effec
+05-violet-blade.jpg	#d52eff

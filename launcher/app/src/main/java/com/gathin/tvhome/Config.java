@@ -218,6 +218,12 @@ final class Config {
     final boolean ambientGlow;
     /** The focus highlight in the focused app's colour on every tile (config.xml, app_glow), as cinematic_home does for the dock. */
     final boolean appGlow;
+    /** The focus highlight and greeting in one colour (theme focus_color); 0 keeps white. */
+    int focusColor;
+    /** A button beside the VPN pill for the wallpaper's next picture, static and interval (theme wallpaper_button). */
+    boolean wallpaperButton;
+    /** The clock, date and greeting in one frosted capsule like the pills (theme clock_glass). */
+    boolean clockGlass;
     /** The rows fade out under the clock instead of being cut off (config.xml, fade_rows); TopFade. */
     final boolean fadeRows;
     /** Minutes Home may sit untouched before the clock screensaver (config.xml, home_idle_clock_minutes); 0 is off. */
@@ -686,7 +692,7 @@ final class Config {
         Festival festival = json == null ? Festival.NONE : Festival.parse(festivalName(json),
                 string(json, "festival_until", ""), string(json, "greeting", ""), string(json, "accent_color", ""));
 
-        return new Config(dock, fillDock, hidden, libraryApps, libraryExcludedApps, liveTv, liveTvAction, liveTvInputId, packageMap(launchActions), packageMap(appLabels),
+        Config built = new Config(dock, fillDock, hidden, libraryApps, libraryExcludedApps, liveTv, liveTvAction, liveTvInputId, packageMap(launchActions), packageMap(appLabels),
                 packageMap(appBanners), panelService, panelAction, panelExtra, coocaaSources, inputAction, inputSources, inputUriScheme, Math.max(1, columns),
                 Math.max(0, rowsBelow), animations, advancedEffects, shamsi, greetingName, moduleCards, reducedMotion, bootToLiveTv,
                 openOnStartChoice, dockTitle, dockRow, topMenu, launcherSettingsButton, reorderButton, showNetworkPill, showInputsPill,
@@ -701,6 +707,17 @@ final class Config {
                 Math.max(0, Math.min(90, clockWallpaperDim)), clockGlow, glassStyle, singleRow && dockRow, dockBandAll, lunar, lunarOffset,
                 dateBelowClock, vpnPill, locale, powerOnHomeAlways, inputsConnectedOnly,
                 Math.max(0, Math.min(600, openOnStartNetworkWait)), iconOnlyVpn, clockFormat, backOpensClock);
+        if (json != null) {
+            built.wallpaperButton = bool(json, "wallpaper_button", false);
+            built.clockGlass = bool(json, "clock_glass", false);
+            try {
+                String focus = string(json, "focus_color", "");
+                if (!focus.isEmpty()) built.focusColor = Color.parseColor(focus);
+            } catch (IllegalArgumentException ignored) {
+                // A colour that does not parse keeps the white highlight, as a bad key never breaks Home.
+            }
+        }
+        return built;
     }
 
     /**
