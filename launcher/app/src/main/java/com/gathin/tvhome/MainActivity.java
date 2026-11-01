@@ -2442,34 +2442,31 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         block.removeView(greeting);
         greeting.setTextSize(11f);
-        LinearLayout.LayoutParams greetingLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        greetingLp.bottomMargin = Math.round(3 * density);
+        LinearLayout.LayoutParams greetingLp = wrapContent();
+        greetingLp.bottomMargin = (int) (3 * density);
         column.addView(greeting, 0, greetingLp);
 
-        date.setFormat12Hour("EEEE, d MMMM");
-        date.setFormat24Hour("EEEE, d MMMM");
+        String dateFormat = "EEEE, d MMMM";
+        date.setFormat12Hour(dateFormat);
+        date.setFormat24Hour(dateFormat);
         date.setAllCaps(false);
         date.setTextSize(16f);
         date.setLetterSpacing(0f);
         date.setTextColor(Color.WHITE);
-        date.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        date.setLayoutParams(wrapContent());
 
         LinearLayout.LayoutParams dividerLp = (LinearLayout.LayoutParams) clockDivider.getLayoutParams();
-        dividerLp.height = Math.round(36 * density);
+        dividerLp.height = (int) (36 * density);
         dividerLp.gravity = Gravity.CENTER_VERTICAL;
         dividerLp.bottomMargin = 0;
         clockDivider.setLayoutParams(dividerLp);
 
-        LinearLayout.LayoutParams columnLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams columnLp = wrapContent();
         columnLp.gravity = Gravity.CENTER_VERTICAL;
         column.setLayoutParams(columnLp);
         clockRow.setBaselineAligned(false);
         clockRow.setGravity(Gravity.CENTER_VERTICAL);
-        clockRow.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        clockRow.setLayoutParams(wrapContent());
         // Without its rule against the top buttons the block is as wide as its texts, so the capsule hugs them.
         android.widget.RelativeLayout.LayoutParams blockLp = (android.widget.RelativeLayout.LayoutParams) block.getLayoutParams();
         blockLp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -2490,8 +2487,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         capsule.setCornerRadius(100 * density);
         capsule.setStroke(Math.round(density), 0x38FFFFFF);
         block.setBackground(capsule);
-        int h = Math.round(26 * density), v = Math.round(9 * density);
+        int h = (int) (26 * density), v = (int) (9 * density);
         block.setPadding(h, v, h, v);
+    }
+
+    private static LinearLayout.LayoutParams wrapContent() {
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     /**
