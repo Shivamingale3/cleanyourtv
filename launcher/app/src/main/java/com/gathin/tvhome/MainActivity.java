@@ -1556,6 +1556,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
+    /** Tile menu's "Remove from dock": the app goes back to the grid and its dock place stays empty. */
+    private void removeFromDock(String key, int position) {
+        if (!beginReorder()) return;
+        dockInSession.remove(key);
+        endReorder();
+        refocusAfterLayout(Math.min(position, adapter.dockFilled() - 1));
+    }
+
     /** Puts the app at pos into dock place slot, and the app that was there where the chosen one was; then saves. */
     private void swapIntoDock(int slot, int pos) {
         String slotKey = adapter.keyAt(slot);
@@ -1564,9 +1572,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 adapter.move(pos, slot);
                 adapter.move(adapter.positionOf(slotKey), pos);
             });
-            dockInSession.add(adapter.keyAt(slot));
             if (pos >= COLUMNS) dockInSession.remove(slotKey);
         }
+        // Outside the check: with no empty slots shown, the chosen app may already sit in the free place.
+        dockInSession.add(adapter.keyAt(slot));
         endReorder();
         refocusAfterLayout(slot);
     }
@@ -3860,6 +3869,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             boolean inDock = position < COLUMNS;
             addSettingsMenuRow(rows, popup, inDock ? R.string.tile_replace_in_dock : R.string.tile_add_to_dock,
                     () -> startDockEditFor(key, inDock));
+            // fill_dock false only: otherwise the first grid app would take the freed place straight away.
+            if (inDock && fillDockLeavesSlots && adapter.dockFilled() > 1) {
+                addSettingsMenuRow(rows, popup, R.string.tile_remove_from_dock, () -> removeFromDock(key, position));
+            }
         }
         if (position < adapter.movableCount()) addSettingsMenuRow(rows, popup, R.string.tile_move, () -> {
             if (!beginReorder()) return;

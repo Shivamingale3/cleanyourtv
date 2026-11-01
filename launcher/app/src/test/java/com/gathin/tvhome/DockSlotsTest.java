@@ -59,6 +59,15 @@ public class DockSlotsTest {
         assertEquals(4, DockSlots.dockCount(keys, 4, dock));
     }
 
+    @Test public void anAppRemovedFromTheDockGoesBehindItAndLeavesAFreeSlot() {
+        // Tile menu's "Remove from dock": the same four tiles, with "jellyfin" no longer in the dock set.
+        List<String> keys = Arrays.asList("tivimate", "jellyfin", "iplayer", "appletv", "my5");
+        Set<String> dock = set("tivimate", "iplayer", "appletv");
+        assertEquals(Arrays.asList("tivimate", "iplayer", "appletv", "jellyfin", "my5"), DockSlots.dockFirst(keys, 4, dock));
+        assertEquals(3, DockSlots.dockCount(keys, 4, dock));
+        assertEquals(1, DockSlots.empty(3, 4, 5, false));
+    }
+
     @Test public void fewerTilesThanDockSlotsStillPutTheDockFirst() {
         List<String> keys = Arrays.asList("a", "b");
         assertEquals(Arrays.asList("b", "a"), DockSlots.dockFirst(keys, 4, set("b")));
