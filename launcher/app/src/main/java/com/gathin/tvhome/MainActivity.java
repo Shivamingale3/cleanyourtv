@@ -3601,8 +3601,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         View still = addWallpaperRow(rows, R.drawable.ic_lock);
         View every = addWallpaperRow(rows, R.drawable.ic_settings);
         Runnable labels = () -> {
-            ((TextView) still.findViewById(R.id.title)).setText(wallpaperPlayer.isStatic()
-                    ? R.string.wallpaper_static_on : R.string.wallpaper_static_off);
+            ((TextView) still.findViewById(R.id.title)).setText(getString(R.string.wallpaper_static,
+                    getString(wallpaperPlayer.isStatic() ? R.string.on : R.string.off)));
             ((TextView) every.findViewById(R.id.title)).setText(getString(R.string.wallpaper_every,
                     minutesLabel(wallpaperPlayer.minutes())));
             every.setAlpha(wallpaperPlayer.isStatic() ? 0.45f : 1f);

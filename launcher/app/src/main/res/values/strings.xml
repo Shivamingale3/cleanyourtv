@@ -55,8 +55,7 @@
     <string name="dock_opacity_label">Dock band opacity</string>
     <string name="wallpaper_label">Wallpaper</string>
     <string name="wallpaper_next" translatable="false">Next wallpaper</string>
-    <string name="wallpaper_static_on" translatable="false">Static: on</string>
-    <string name="wallpaper_static_off" translatable="false">Static: off</string>
+    <string name="wallpaper_static" translatable="false">Static: %1$s</string>
     <string name="wallpaper_every" translatable="false">Change every: %1$s</string>
     <string name="wallpaper_state">Wallpaper: %1$s</string>
     <string name="wallpaper_none">None</string>
